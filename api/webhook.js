@@ -8,21 +8,28 @@ export default async function handler(req, res) {
   try {
     const data = req.body || {};
 
-    console.log('STEP 1: webhook hit');
-    console.log('STEP 2: raw Tilda data:', JSON.stringify(data));
+    const getFirst = (...keys) => {
+      for (const key of keys) {
+        if (data[key] !== undefined && data[key] !== null && String(data[key]).trim() !== '') {
+          return String(data[key]).trim();
+        }
+      }
+      return '';
+    };
 
-    const fio = data.Name || '';
-    let phoneNumber = data.Phone || '';
+    const fio = getFirst('Name', 'name');
+    let phoneNumber = getFirst('Phone', 'phone', 'phone number');
+    const email = getFirst('Email', 'email', 'e-mail');
+    const sessionId = getFirst('ct_session_id', 'sessionId', 'session_id');
+    const requestNumber = getFirst('tranid', 'tranId', 'requestNumber');
+    const formId = getFirst('formid', 'formId');
 
-    phoneNumber = String(phoneNumber).replace(/\D/g, '');
+    phoneNumber = phoneNumber.replace(/\D/g, '');
     if (phoneNumber.startsWith('8')) {
       phoneNumber = '7' + phoneNumber.slice(1);
     }
 
-    const email = data.Email || '';
-    const sessionId = data.ct_session_id || '';
-    const requestNumber = data.tranid || '';
-    const subject = 'Tilda form';
+    const subject = formId ? `Tilda form ${formId}` : 'Tilda form';
     const requestUrl = req.headers.referer || '';
 
     const params = new URLSearchParams();
@@ -35,7 +42,18 @@ export default async function handler(req, res) {
     if (email) params.append('email', email);
     if (requestUrl) params.append('requestUrl', requestUrl);
 
-    console.log('STEP 3: params to Calltouch:', params.toString());
+    console.log('STEP 1: webhook hit');
+    console.log('STEP 2: raw Tilda data:', JSON.stringify(data));
+    console.log('STEP 3: extracted values:', JSON.stringify({
+      fio,
+      phoneNumber,
+      email,
+      sessionId,
+      requestNumber,
+      formId,
+      requestUrl
+    }));
+    console.log('STEP 4: params to Calltouch:', params.toString());
 
     const calltouchResponse = await fetch(
       'https://api.calltouch.ru/calls-service/RestAPI/requests/81493/register/',
@@ -50,8 +68,8 @@ export default async function handler(req, res) {
 
     const responseText = await calltouchResponse.text();
 
-    console.log('STEP 4: Calltouch status:', calltouchResponse.status);
-    console.log('STEP 5: Calltouch response:', responseText);
+    console.log('STEP 5: Calltouch status:', calltouchResponse.status);
+    console.log('STEP 6: Calltouch response:', responseText);
 
     res.statusCode = 200;
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
