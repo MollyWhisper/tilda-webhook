@@ -7,7 +7,12 @@ export default async function handler(req, res) {
     const data = req.body || {};
 
     const fio = data.Name || '';
-    const phoneNumber = data.Phone || '';
+    let phoneNumber = data.Phone || '';
+
+    phoneNumber = phoneNumber.replace(/\D/g, ''); // оставить только цифры
+    if (phoneNumber.startsWith('8')) {
+    phoneNumber = '7' + phoneNumber.slice(1);
+    }
     const email = data.Email || '';
     const sessionId = data.ct_session_id || '';
     const requestNumber = data.tranid || '';
