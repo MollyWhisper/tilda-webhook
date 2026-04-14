@@ -32,6 +32,55 @@ export default async function handler(req, res) {
     const subject = formId ? `Tilda form ${formId}` : 'Tilda form';
     const requestUrl = req.headers.referer || '';
 
+    const parseTildaUtmFromCookies = (cookieString = '') => {
+      const result = {
+        utm_source: '',
+        utm_medium: '',
+        utm_campaign: '',
+        utm_content: '',
+        utm_term: '',
+      };
+
+      if (!cookieString) return result;
+
+      const match = cookieString.match(/(?:^|;\s*)TILDAUTM=([^;]+)/);
+      if (!match || !match[1]) return result;
+
+      let decoded = match[1];
+      try {
+        decoded = decodeURIComponent(decoded);
+      } catch (e) {}
+
+      decoded = decoded.replace(/amp;/g, '');
+
+      const parts = decoded.split('|||');
+      for (const part of parts) {
+        const [rawKey, rawValue] = part.split('=');
+        if (!rawKey || rawValue === undefined) continue;
+
+        const key = rawKey.trim();
+        const value = rawValue.trim();
+
+        if (Object.prototype.hasOwnProperty.call(result, key)) {
+          result[key] = value;
+        }
+      }
+
+      return result;
+    };
+
+    const utm = parseTildaUtmFromCookies(data.COOKIES || '');
+
+    const utmCommentLines = [
+      `utm_source: ${utm.utm_source || '-'}`,
+      `utm_medium: ${utm.utm_medium || '-'}`,
+      `utm_campaign: ${utm.utm_campaign || '-'}`,
+      `utm_content: ${utm.utm_content || '-'}`,
+      `utm_term: ${utm.utm_term || '-'}`,
+    ];
+
+    const comment = utmCommentLines.join('\n');
+
     const params = new URLSearchParams();
 
     if (subject) params.append('subject', subject);
@@ -41,6 +90,7 @@ export default async function handler(req, res) {
     if (phoneNumber) params.append('phoneNumber', phoneNumber);
     if (email) params.append('email', email);
     if (requestUrl) params.append('requestUrl', requestUrl);
+    if (comment) params.append('comment', comment);
 
     console.log('STEP 1: webhook hit');
     console.log('STEP 2: raw Tilda data:', JSON.stringify(data));
@@ -51,7 +101,9 @@ export default async function handler(req, res) {
       sessionId,
       requestNumber,
       formId,
-      requestUrl
+      requestUrl,
+      utm,
+      comment
     }));
     console.log('STEP 4: params to Calltouch:', params.toString());
 
